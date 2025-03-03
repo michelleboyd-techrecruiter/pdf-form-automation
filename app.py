@@ -3,7 +3,7 @@ import fitz  # PyMuPDF for PDF processing
 import pdfrw  # For creating fillable PDF forms
 from flask import Flask, request, render_template, send_file
 from werkzeug.utils import secure_filename
-from pdfrw import PdfReader, PdfWriter
+from pdfrw import PdfReader, PdfWriter, PageMerge
 import re
 
 app = Flask(__name__)
@@ -12,45 +12,89 @@ PROCESSED_FOLDER = "processed"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
+# Define section headers
+SECTION_HEADERS = {
+    "Candidate References": "references",
+    "Candidate Qualifications": "qualifications",
+    "Candidate Acknowledgment": "acknowledgment"
+}
+
 def extract_solicitation_number(input_pdf):
     """Extracts the Solicitation Number from the document."""
     try:
         doc = fitz.open(input_pdf)
         for page in doc:
             text = page.get_text("text")
-            match = re.search(r"Solicitation Reference Number\s*:?\s*(\S+)", text, re.IGNORECASE)
+            match = re.search(r"Solicitation(?: Reference)? Number\s*:?\s*(\S+)", text, re.IGNORECASE)
             if match:
                 return match.group(1)
     except Exception as e:
         print(f"Error extracting solicitation number: {e}")
     return "Unknown"
 
+def split_document(input_pdf):
+    """Splits the document into sections based on predefined headers."""
+    doc = fitz.open(input_pdf)
+    sections = {"static": []}
+    current_section = "static"
+    
+    for i, page in enumerate(doc):
+        text = page.get_text("text")
+        for header, section_name in SECTION_HEADERS.items():
+            if header in text:
+                current_section = section_name
+                sections[current_section] = []
+        sections[current_section].append(i)
+    
+    return doc, sections
+
+def create_filled_pdf(input_pdf, pages, output_pdf):
+    """Creates a fillable PDF from selected pages."""
+    doc = fitz.open(input_pdf)
+    writer = PdfWriter()
+    for page_num in pages:
+        writer.addpage(PdfReader(input_pdf).pages[page_num])
+    writer.write(output_pdf)
+
+def add_form_fields(input_pdf, output_pdf, section):
+    """Adds fillable form fields to PDFs."""
+    annotations = {
+        "references": [(100, 200, 400, 220)],  # Example positions
+        "qualifications": [(100, 300, 400, 320)],
+        "acknowledgment": [(100, 400, 400, 420), (150, 500, 350, 520)]
+    }
+    
+    template = PdfReader(input_pdf)
+    for page in template.pages:
+        for rect in annotations.get(section, []):
+            annotation = pdfrw.PdfDict(
+                Rect=rect, T=f"{section}_field", FT="Tx", V="", Ff=1, AP=pdfrw.PdfDict(N=None)
+            )
+            if "Annots" in page:
+                page.Annots.append(annotation)
+            else:
+                page.Annots = [annotation]
+    
+    PdfWriter(output_pdf, trailer=template).write()
+
 def process_document(input_pdf):
-    """Process the input document to generate structured PDFs."""
+    """Processes the input document into structured PDFs."""
     try:
         solicitation_number = extract_solicitation_number(input_pdf)
         print(f"Extracted Solicitation Number: {solicitation_number}")
         base_name = f"{solicitation_number}_TEEMAInc"
         
-        output_static = os.path.join(PROCESSED_FOLDER, f"{base_name}_Static.pdf")
-        output_references = os.path.join(PROCESSED_FOLDER, f"{base_name}_References.pdf")
-        output_qualifications = os.path.join(PROCESSED_FOLDER, f"{base_name}_Qualifications.pdf")
-        output_acknowledgment = os.path.join(PROCESSED_FOLDER, f"{base_name}_Acknowledgment.pdf")
+        doc, sections = split_document(input_pdf)
+        processed_files = []
         
-        print("Saving processed files...")
-        doc = fitz.open(input_pdf)
-        doc.save(output_static)
-        doc.save(output_references)
-        doc.save(output_qualifications)
-        doc.save(output_acknowledgment)
-        print("Files saved successfully.")
+        for section, pages in sections.items():
+            output_pdf = os.path.join(PROCESSED_FOLDER, f"{base_name}_{section.capitalize()}.pdf")
+            create_filled_pdf(input_pdf, pages, output_pdf)
+            if section in SECTION_HEADERS.values():
+                add_form_fields(output_pdf, output_pdf, section)
+            processed_files.append(os.path.basename(output_pdf))
         
-        return [
-            os.path.basename(output_static),
-            os.path.basename(output_references),
-            os.path.basename(output_qualifications),
-            os.path.basename(output_acknowledgment)
-        ]
+        return processed_files
     except Exception as e:
         print(f"Error processing document: {e}")
         return []
