@@ -25,8 +25,10 @@ def extract_solicitation_number(input_pdf):
         doc = fitz.open(input_pdf)
         for page in doc:
             text = page.get_text("text")
-            match = re.search(r"Solicitation(?: Reference)? Number\s*:?\s*(\S+)", text, re.IGNORECASE)
+            print(f"Page text for solicitation extraction: {text}")  # Debugging
+            match = re.search(r"Solicitation(?: Reference)? Number\s*:?[\s]*([\w-]+)", text, re.IGNORECASE)
             if match:
+                print(f"Found Solicitation Number: {match.group(1)}")
                 return match.group(1)
     except Exception as e:
         print(f"Error extracting solicitation number: {e}")
@@ -40,10 +42,12 @@ def split_document(input_pdf):
     
     for i, page in enumerate(doc):
         text = page.get_text("text")
+        print(f"Processing Page {i}: {text}")  # Debugging
         for header, section_name in SECTION_HEADERS.items():
             if header in text:
                 current_section = section_name
                 sections[current_section] = []
+                print(f"Found section {current_section} on page {i}")
         sections[current_section].append(i)
     
     return doc, sections
@@ -57,18 +61,18 @@ def create_filled_pdf(input_pdf, pages, output_pdf):
     writer.write(output_pdf)
 
 def add_form_fields(input_pdf, output_pdf, section):
-    """Adds fillable form fields to PDFs."""
-    annotations = {
-        "references": [(100, 200, 400, 220)],  # Example positions
+    """Adds fillable form fields to PDFs with correct positions."""
+    field_positions = {
+        "references": [(100, 200, 400, 220)],
         "qualifications": [(100, 300, 400, 320)],
-        "acknowledgment": [(100, 400, 400, 420), (150, 500, 350, 520)]
+        "acknowledgment": [(150, 450, 400, 470), (150, 500, 350, 520)]  # Signature & Date Fields
     }
     
     template = PdfReader(input_pdf)
     for page in template.pages:
-        for rect in annotations.get(section, []):
+        for idx, rect in enumerate(field_positions.get(section, [])):
             annotation = pdfrw.PdfDict(
-                Rect=rect, T=f"{section}_field", FT="Tx", V="", Ff=1, AP=pdfrw.PdfDict(N=None)
+                Rect=rect, T=f"{section}_field_{idx}", FT="Tx", V="", Ff=1, AP=pdfrw.PdfDict(N=None)
             )
             if "Annots" in page:
                 page.Annots.append(annotation)
@@ -76,6 +80,7 @@ def add_form_fields(input_pdf, output_pdf, section):
                 page.Annots = [annotation]
     
     PdfWriter(output_pdf, trailer=template).write()
+    print(f"Added fillable fields to {output_pdf}")
 
 def process_document(input_pdf):
     """Processes the input document into structured PDFs."""
@@ -88,6 +93,8 @@ def process_document(input_pdf):
         processed_files = []
         
         for section, pages in sections.items():
+            if not pages:  # Skip empty sections
+                continue
             output_pdf = os.path.join(PROCESSED_FOLDER, f"{base_name}_{section.capitalize()}.pdf")
             create_filled_pdf(input_pdf, pages, output_pdf)
             if section in SECTION_HEADERS.values():
