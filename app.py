@@ -5,7 +5,7 @@ from flask import Flask, request, render_template, send_file
 from werkzeug.utils import secure_filename
 from pdfrw import PdfReader, PdfWriter
 from docx import Document
-import subprocess
+import pypandoc
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
@@ -14,10 +14,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 def convert_doc_to_pdf(input_doc, output_pdf):
-    """Convert .doc or .docx to PDF using unoconv (works on Render)."""
+    """Convert .doc or .docx to PDF using pypandoc (works on Render)."""
     try:
         print(f"Converting {input_doc} to PDF...")
-        subprocess.run(["unoconv", "-f", "pdf", "-o", output_pdf, input_doc], check=True)
+        pypandoc.convert_file(input_doc, "pdf", outputfile=output_pdf)
         print(f"Conversion successful: {output_pdf}")
         return output_pdf
     except Exception as e:
