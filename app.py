@@ -14,25 +14,16 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 def convert_doc_to_pdf(input_doc, output_pdf):
-    """Convert .doc or .docx to PDF using LibreOffice or Microsoft Word."""
+    """Convert .doc or .docx to PDF using LibreOffice (works on Render)."""
     try:
-        if input_doc.lower().endswith(".doc") or input_doc.lower().endswith(".docx"):
-            print(f"Converting {input_doc} to PDF...")
-            if os.name == "nt":  # Windows
-                import comtypes.client
-                word = comtypes.client.CreateObject("Word.Application")
-                doc = word.Documents.Open(os.path.abspath(input_doc))
-                doc.SaveAs(os.path.abspath(output_pdf), FileFormat=17)
-                doc.Close()
-                word.Quit()
-            else:  # Linux & Mac using LibreOffice CLI
-                subprocess.run([
-                    "libreoffice", "--headless", "--convert-to", "pdf", input_doc,
-                    "--outdir", os.path.dirname(output_pdf)
-                ])
-            print(f"Conversion successful: {output_pdf}")
-            return output_pdf
-        return None
+        print(f"Converting {input_doc} to PDF...")
+        subprocess.run([
+            "libreoffice", "--headless", "--convert-to", "pdf", input_doc,
+            "--outdir", os.path.dirname(output_pdf)
+        ], check=True)
+        converted_pdf = input_doc.replace(".doc", ".pdf").replace(".docx", ".pdf")
+        print(f"Conversion successful: {converted_pdf}")
+        return converted_pdf
     except Exception as e:
         print(f"Error converting DOC to PDF: {e}")
         return None
