@@ -3,4 +3,4 @@ gunicorn
 pymupdf
 pdfrw
 python-docx
-libreoffice
+unoconv
