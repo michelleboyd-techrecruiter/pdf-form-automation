@@ -14,16 +14,12 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 def convert_doc_to_pdf(input_doc, output_pdf):
-    """Convert .doc or .docx to PDF using LibreOffice (works on Render)."""
+    """Convert .doc or .docx to PDF using unoconv (works on Render)."""
     try:
         print(f"Converting {input_doc} to PDF...")
-        subprocess.run([
-            "libreoffice", "--headless", "--convert-to", "pdf", input_doc,
-            "--outdir", os.path.dirname(output_pdf)
-        ], check=True)
-        converted_pdf = input_doc.replace(".doc", ".pdf").replace(".docx", ".pdf")
-        print(f"Conversion successful: {converted_pdf}")
-        return converted_pdf
+        subprocess.run(["unoconv", "-f", "pdf", "-o", output_pdf, input_doc], check=True)
+        print(f"Conversion successful: {output_pdf}")
+        return output_pdf
     except Exception as e:
         print(f"Error converting DOC to PDF: {e}")
         return None
