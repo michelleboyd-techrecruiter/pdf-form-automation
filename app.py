@@ -4,25 +4,12 @@ import pdfrw  # For creating fillable PDF forms
 from flask import Flask, request, render_template, send_file
 from werkzeug.utils import secure_filename
 from pdfrw import PdfReader, PdfWriter
-from docx import Document
-import pypandoc
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 PROCESSED_FOLDER = "processed"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
-
-def convert_doc_to_pdf(input_doc, output_pdf):
-    """Convert .doc or .docx to PDF using pypandoc (works on Render)."""
-    try:
-        print(f"Converting {input_doc} to PDF...")
-        pypandoc.convert_file(input_doc, "pdf", outputfile=output_pdf)
-        print(f"Conversion successful: {output_pdf}")
-        return output_pdf
-    except Exception as e:
-        print(f"Error converting DOC to PDF: {e}")
-        return None
 
 def extract_solicitation_number(input_pdf):
     """Extracts the Solicitation Number from the document."""
@@ -79,17 +66,13 @@ def upload_file():
                 return "No selected file!"
             
             filename = secure_filename(file.filename)
+            if not filename.lower().endswith(".pdf"):
+                return "Only PDF files are allowed!"
+            
             file_path = os.path.join(UPLOAD_FOLDER, filename)
             print(f"Saving uploaded file to: {file_path}")
             file.save(file_path)
             print("File saved successfully.")
-            
-            # Convert DOC/DOCX to PDF if needed
-            if filename.lower().endswith(".doc") or filename.lower().endswith(".docx"):
-                converted_pdf_path = file_path.replace(".doc", ".pdf").replace(".docx", ".pdf")
-                file_path = convert_doc_to_pdf(file_path, converted_pdf_path)
-                if not file_path:
-                    return "Error converting DOC to PDF!"
             
             processed_files = process_document(file_path)
             if not processed_files:
