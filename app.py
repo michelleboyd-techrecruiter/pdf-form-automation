@@ -26,7 +26,7 @@ def extract_solicitation_number(input_pdf):
         for page in doc:
             text = page.get_text("text")
             print(f"Page text for solicitation extraction: {text}")  # Debugging
-            match = re.search(r"Solicitation(?: Reference)? Number\s*:?\s*([\w-]+)", text, re.IGNORECASE)
+            match = re.search(r"Solicitation(?: Reference)? Number\s*:?[\s]*([\w-]+)", text, re.IGNORECASE)
             if match:
                 print(f"Found Solicitation Number: {match.group(1)}")
                 return match.group(1)
@@ -48,9 +48,9 @@ def split_document(input_pdf):
                 current_section = section_name
                 sections[current_section] = []
                 print(f"Found section {current_section} on page {i}")
-        if current_section in sections:
-            sections[current_section].append(i)
+        sections[current_section].append(i)
     
+    print(f"Document sections: {sections}")  # Debugging
     return doc, sections
 
 def create_filled_pdf(input_pdf, pages, output_pdf):
@@ -104,6 +104,7 @@ def process_document(input_pdf):
                 add_form_fields(output_pdf, output_pdf, section)
             processed_files.append(os.path.basename(output_pdf))
         
+        print(f"Processed files: {processed_files}")
         return processed_files
     except Exception as e:
         print(f"Error processing document: {e}")
