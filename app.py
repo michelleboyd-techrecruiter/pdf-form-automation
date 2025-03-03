@@ -4,6 +4,7 @@ import pdfrw  # For creating fillable PDF forms
 from flask import Flask, request, render_template, send_file
 from werkzeug.utils import secure_filename
 from pdfrw import PdfReader, PdfWriter
+import re
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
@@ -17,10 +18,9 @@ def extract_solicitation_number(input_pdf):
         doc = fitz.open(input_pdf)
         for page in doc:
             text = page.get_text("text")
-            lines = text.split("\n")
-            for line in lines:
-                if "Solicitation Reference Number:" in line:
-                    return line.split(":")[1].strip()
+            match = re.search(r"Solicitation Reference Number\s*:?\s*(\S+)", text, re.IGNORECASE)
+            if match:
+                return match.group(1)
     except Exception as e:
         print(f"Error extracting solicitation number: {e}")
     return "Unknown"
@@ -38,17 +38,18 @@ def process_document(input_pdf):
         output_acknowledgment = os.path.join(PROCESSED_FOLDER, f"{base_name}_Acknowledgment.pdf")
         
         print("Saving processed files...")
-        fitz.open(input_pdf).save(output_static)
-        fitz.open(input_pdf).save(output_references)
-        fitz.open(input_pdf).save(output_qualifications)
-        fitz.open(input_pdf).save(output_acknowledgment)
+        doc = fitz.open(input_pdf)
+        doc.save(output_static)
+        doc.save(output_references)
+        doc.save(output_qualifications)
+        doc.save(output_acknowledgment)
         print("Files saved successfully.")
         
         return [
-            f"{base_name}_Static.pdf",
-            f"{base_name}_References.pdf",
-            f"{base_name}_Qualifications.pdf",
-            f"{base_name}_Acknowledgment.pdf"
+            os.path.basename(output_static),
+            os.path.basename(output_references),
+            os.path.basename(output_qualifications),
+            os.path.basename(output_acknowledgment)
         ]
     except Exception as e:
         print(f"Error processing document: {e}")
@@ -85,7 +86,7 @@ def upload_file():
     
     return render_template("upload.html")
 
-@app.route("/download/<path:filename>")
+@app.route("/download/<filename>")
 def download_file(filename):
     file_path = os.path.join(PROCESSED_FOLDER, filename)
     if os.path.exists(file_path):
