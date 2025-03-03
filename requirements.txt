@@ -3,5 +3,4 @@ gunicorn
 pymupdf
 pdfrw
 python-docx
-comtypes; sys_platform == 'win32'
 libreoffice
